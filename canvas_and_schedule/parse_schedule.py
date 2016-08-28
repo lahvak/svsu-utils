@@ -1,17 +1,12 @@
-import warnings
+from warnings import warn
 from markdown import markdown
 import arrow
 import yaml
 import canvas
-try:
-    from classid import classid
-except ImportError:
-    classid = 0
-    warn("You have to set up class id in a local classid.py file!")
 
 def holiday(day, end=None):
     start = day.floor('day')
-    if end == None:
+    if end is None:
         end = day.ceil('day')
     else:
         end = end.ceil('day')
@@ -28,7 +23,6 @@ def dates_to_holiday(dates):
         return holiday(arrow.get(dates['Start']))
 
 def load_holidays(file):
-    hdays = {}
     with open(file, 'r') as holidayfile:
         hdata = yaml.load(holidayfile)
 
@@ -40,45 +34,45 @@ def load_holidays(file):
     return startdate, {dates_to_holiday(dates): name for name, dates in hdata.items() if
             name != "Classes Begin"}
 
-def MW(start,weeks,holidays = None):
+def MW(start, weeks, holidays=None):
     """
     Assume start is Monday.
     """
-    days = [day for day in arrow.Arrow.range("week",start,start.replace(weeks=+weeks))]
+    days = [day for day in arrow.Arrow.range("week", start, start.replace(weeks=+weeks))]
     wed = start.replace(days=+2)
-    days += [day for day in arrow.Arrow.range("week",wed,wed.replace(weeks=+weeks))]
+    days += [day for day in arrow.Arrow.range("week", wed, wed.replace(weeks=+weeks))]
 
-    if holidays == None:
+    if holidays is None:
         return sorted([day for day in days])
 
-    return sorted([day for day in days if not is_holiday(day,holidays)])
+    return sorted([day for day in days if not is_holiday(day, holidays)])
 
-def TR(start,weeks,holidays = None):
+def TR(start, weeks, holidays=None):
     """
     Assume start is Monday.
     """
     tue = start.replace(days=+1)
-    days = [day for day in arrow.Arrow.range("week",tue,tue.replace(weeks=+weeks))]
+    days = [day for day in arrow.Arrow.range("week", tue, tue.replace(weeks=+weeks))]
     thu = tue.replace(days=+2)
-    days += [day for day in arrow.Arrow.range("week",thu,thu.replace(weeks=+weeks))]
+    days += [day for day in arrow.Arrow.range("week", thu, thu.replace(weeks=+weeks))]
 
-    if holidays == None:
+    if holidays is None:
         return sorted([day for day in days])
 
-    return sorted([day for day in days if not is_holiday(day,holidays)])
+    return sorted([day for day in days if not is_holiday(day, holidays)])
 
 def mkeventlist(events, dayfun, start, holidays, weeks=14):
     i = iter(events)
     l = []
-    for day in dayfun(start,weeks):
-        if is_holiday(day,holidays):
-            l.append(("","Holiday"))
+    for day in dayfun(start, weeks):
+        if is_holiday(day, holidays):
+            l.append(("", "Holiday"))
         else:
             try:
                 l.append(next(i))
             except StopIteration:
                 l.append("")
-                print("Not enough events scheduled")
+                warn("Not enough events scheduled")
 
     return l
 
@@ -115,17 +109,17 @@ TeXHead = r"""
 }
 """
 
-def TeXCalStart(startdate,dow,weeks=15):
+def TeXCalStart(startdate, dow, weeks=15):
     "dow = TR or MW"
-    tex = r"\begin{document}\begin{center}\begin{calendar}{" + startdate + "}{" 
+    tex = r"\begin{document}\begin{center}\begin{calendar}{" + startdate + "}{"
     tex += str(weeks) + "}\\setlength{\\calboxdepth}{.3in}\\" + dow + "Class"
     return tex
 
 def TeXCalEnd(holidays):
     tex = "%Holidays\n"
-    for d,t in holidays.items():
-        for day in arrow.Arrow.range('day',d[0],d[1]):
-            tex += "\\Holiday{{{}}}{{{}}}\n".format(day.format('M/D/YYYY'),t)
+    for d, t in holidays.items():
+        for day in arrow.Arrow.range('day', d[0], d[1]):
+            tex += "\\Holiday{{{}}}{{{}}}\n".format(day.format('M/D/YYYY'), t)
 
     return tex + r"\end{calendar}\end{center}\end{document}"
 
@@ -133,16 +127,16 @@ def TeXCalItems(eventlist):
     str1 = r"\caltexton{{1}}{{{}}}"
     str2 = r"\caltextnext{{{}}}"
     yield str1.format(eventlist[0][0])
-    for s,_ in eventlist[1:]:
+    for s, _ in eventlist[1:]:
         yield str2.format(s)
 
-def TeXCal(start,dow,events,holidays,weeks=15):
-    return TeXCalStart(start,dow,weeks) + "\n".join(list(TeXCalItems(events))) + TeXCalEnd(holidays)
+def TeXCal(start, dow, events, holidays, weeks=15):
+    return TeXCalStart(start, dow, weeks) + "\n".join(list(TeXCalItems(events))) + TeXCalEnd(holidays)
 
-def write_tex_file(fn,start,dow,events,holidays,weeks=15):
+def write_tex_file(fn, start, dow, events, holidays, weeks=15):
     with open(fn, 'w') as texfile:
         texfile.writelines([TeXHead,
-                            TeXCal(start,dow,events,holidays,weeks)])
+                            TeXCal(start, dow, events, holidays, weeks)])
 
 def read_event_list(datafile):
     "Reads event list from a markdown file"
@@ -153,12 +147,12 @@ def read_event_list(datafile):
 
     # The first line will start with ## .  Remove it:
     if days[0][0][:3] == "## ":
-        days[0] = (days[0][0][3:],days[0][1])
+        days[0] = (days[0][0][3:], days[0][1])
 
     return days
 
 def parse_schedule(classid, datafile, holidayfile, dow, hour, minute,
-                   length=110, post=False, manualstart = None):
+                   length=110, post=False, manualstart=None):
     """
     Reads event list form datafile, holidays from holidayfile, and sets up a
     schedule.
