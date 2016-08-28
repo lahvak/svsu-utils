@@ -4,11 +4,11 @@ from yaml import dump
 SEMESTER = "Fall"
 
 def daterange_to_yaml(daterange):
-    """Converts a tuple into a dict with 'From' and optional 'To' keys"""
+    """Converts a tuple into a dict with 'Start' and optional 'End' keys"""
     if daterange[1] is None:
-        return {'From': daterange[0].date()}
+        return {'Start': daterange[0].date()}
     else:
-        return {'From': daterange[0].date(), 'To': daterange[1].date()}
+        return {'Start': daterange[0].date(), 'End': daterange[1].date()}
 
 def semester_to_yaml(semester):
     """Prepares semester data for exporting as YAML"""
