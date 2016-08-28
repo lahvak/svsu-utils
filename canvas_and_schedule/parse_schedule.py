@@ -49,7 +49,7 @@ def MW(start, weeks, holidays=None):
 
 def TR(start, weeks, holidays=None):
     """
-    Assume start is Monday.
+    Assume start is Tuesday.
     """
     tue = start.replace(days=+1)
     days = [day for day in arrow.Arrow.range("week", tue, tue.replace(weeks=+weeks))]
@@ -131,7 +131,10 @@ def TeXCalItems(eventlist):
         yield str2.format(s)
 
 def TeXCal(start, dow, events, holidays, weeks=15):
-    return TeXCalStart(start, dow, weeks) + "\n".join(list(TeXCalItems(events))) + TeXCalEnd(holidays)
+    texstring = TeXCalStart(start, dow, weeks)
+    texstring += "\n".join(list(TeXCalItems(events)))
+    texstring += TeXCalEnd(holidays)
+    return texstring
 
 def write_tex_file(fn, start, dow, events, holidays, weeks=15):
     with open(fn, 'w') as texfile:
@@ -143,7 +146,8 @@ def read_event_list(datafile):
     with open(datafile, 'r') as data:
         schedule_str = data.read()
 
-    days = [(lambda d: (d[0], markdown(d[1])))(s.split('\n',1)) for s in schedule_str.split('\n## ')]
+    days = [(lambda d: (d[0], markdown(d[1])))(s.split('\n',1)) 
+            for s in schedule_str.split('\n## ')]
 
     # The first line will start with ## .  Remove it:
     if days[0][0][:3] == "## ":
