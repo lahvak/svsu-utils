@@ -1,8 +1,13 @@
+import warnings
 import canvas
 from markdown import markdown
 import arrow
-from classid import classid
 import yaml
+try:
+    from classid import classid
+except ImportError:
+    classid = 0
+    warn("You have to set up class id in a local classid.py file!")
 
 def holiday(day, end=None):
     start = day.floor('day')
