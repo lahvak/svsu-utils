@@ -1,8 +1,8 @@
 import warnings
-import canvas
 from markdown import markdown
 import arrow
 import yaml
+import canvas
 try:
     from classid import classid
 except ImportError:
@@ -157,30 +157,37 @@ def read_event_list(datafile):
 
     return days
 
-start, hdays = load_holidays("../../../holidays.yaml")
+def parse_schedule(classid, datafile, holidayfile, dow, hour, minute,
+                   length=110, post=False, manualstart = None):
+    """
+    Reads event list form datafile, holidays from holidayfile, and sets up a
+    schedule.
 
-if start is None:
-    start = arrow.get(2016,1,11) # set this manually
+    dow: day of week
+    hour: starting hour on 24 hour format
+    minute: starting minute
+    length: class length in minutes
+    post: if True, post on canvas
+    manualstart: specify this is "Classes Begin" is not in holiday file
+    """
 
-hour = 12
-minute = 30
-length = 110
+    start, hdays = load_holidays(holidayfile)
 
-DOW = "TR"
+    if start is None:
+        if manualstart is not None:
+            start = manualstart
+        else:
+            raise ValueError("No start date given!")
 
-post = False
+    event_list = read_event_list(datafile)
 
-datafile = "events.md"
+    write_tex_file("sched.tex", start.format("MM/DD/YYYY"), dow, event_list, hdays)
 
-event_list = read_event_list(datafile)
+    el = mkeventlist(event_list, funindex[dow], start, hdays)
 
-write_tex_file("sched.tex",start.format("MM/DD/YYYY"),DOW,event_list,hdays)
-
-el = mkeventlist(event_list, funindex[DOW], start, hdays)
-
-if post:
-    firstclass = canvas.firstclass(start.month,start.day,hour,minute)
-    if DOW == "TR":
-        firstclass = firstclass.replace(days=+1)
-    canvas.read_access_token()
-    canvas.create_events_from_list(classid, el, firstclass, length)
+    if post and classid != 0:
+        firstclass = canvas.firstclass(start.month, start.day, hour, minute)
+        if dow == "TR":
+            firstclass = firstclass.replace(days=+1)
+        canvas.read_access_token()
+        canvas.create_events_from_list(classid, el, firstclass, length)
