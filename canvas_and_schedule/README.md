@@ -4,6 +4,6 @@
    holiday list, and produces a schedule for the semester. Optionally, posts
    the schedule to canvas.
 
-   Needs a major reorganization!
+   Needs docstrings!
 
 *  `README.md`: this file
