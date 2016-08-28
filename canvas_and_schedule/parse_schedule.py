@@ -1,3 +1,8 @@
+"""
+Module for parsing a class schedule.  Main interface is `parse_schedule`, that
+takes a schedule file, holiday file, and few class parameters, creates a TeX
+schedule file, and optionally posts schedule to Canvas.
+"""
 from warnings import warn
 from markdown import markdown
 import arrow
@@ -5,6 +10,7 @@ import yaml
 import canvas
 
 def holiday(day, end=None):
+    """Creates a event time range."""
     start = day.floor('day')
     if end is None:
         end = day.ceil('day')
@@ -13,16 +19,20 @@ def holiday(day, end=None):
 
     return (start, end)
 
-def is_holiday(day,holidays):
+def is_holiday(day, holidays):
+    """Tests if a day falls into one of given holiday time ranges."""
     return any(h[0] <= day <= h[1] in h for h in holidays)
 
 def dates_to_holiday(dates):
+    """Converts a yaml holiday times to a holiday range."""
     if "End" in dates:
         return holiday(arrow.get(dates['Start']), end=arrow.get(dates['End']))
     else:
         return holiday(arrow.get(dates['Start']))
 
 def load_holidays(file):
+    """Load holidays yaml file.  Returns a holiday list and starting day, if
+    found in the file."""
     with open(file, 'r') as holidayfile:
         hdata = yaml.load(holidayfile)
 
@@ -32,7 +42,7 @@ def load_holidays(file):
         startdate = None
 
     return startdate, {dates_to_holiday(dates): name for name, dates in hdata.items() if
-            name != "Classes Begin"}
+                       name != "Classes Begin"}
 
 def MW(start, weeks, holidays=None):
     """
@@ -62,6 +72,8 @@ def TR(start, weeks, holidays=None):
     return sorted([day for day in days if not is_holiday(day, holidays)])
 
 def mkeventlist(events, dayfun, start, holidays, weeks=14):
+    """Go trough list of events and schedule them into available dates,
+    avoiding holidays."""
     i = iter(events)
     l = []
     for day in dayfun(start, weeks):
@@ -110,12 +122,13 @@ TeXHead = r"""
 """
 
 def TeXCalStart(startdate, dow, weeks=15):
-    "dow = TR or MW"
+    """Start of TeX calendar string. dow = TR or MW"""
     tex = r"\begin{document}\begin{center}\begin{calendar}{" + startdate + "}{"
     tex += str(weeks) + "}\\setlength{\\calboxdepth}{.3in}\\" + dow + "Class"
     return tex
 
 def TeXCalEnd(holidays):
+    """End of TeX calendar string."""
     tex = "%Holidays\n"
     for d, t in holidays.items():
         for day in arrow.Arrow.range('day', d[0], d[1]):
@@ -124,6 +137,7 @@ def TeXCalEnd(holidays):
     return tex + r"\end{calendar}\end{center}\end{document}"
 
 def TeXCalItems(eventlist):
+    """TeX representation of event list."""
     str1 = r"\caltexton{{1}}{{{}}}"
     str2 = r"\caltextnext{{{}}}"
     yield str1.format(eventlist[0][0])
@@ -131,12 +145,14 @@ def TeXCalItems(eventlist):
         yield str2.format(s)
 
 def TeXCal(start, dow, events, holidays, weeks=15):
+    """Put together all the infor and create a TeX calendar."""
     texstring = TeXCalStart(start, dow, weeks)
     texstring += "\n".join(list(TeXCalItems(events)))
     texstring += TeXCalEnd(holidays)
     return texstring
 
 def write_tex_file(fn, start, dow, events, holidays, weeks=15):
+    """Write TeX calendar into a file."""
     with open(fn, 'w') as texfile:
         texfile.writelines([TeXHead,
                             TeXCal(start, dow, events, holidays, weeks)])
@@ -146,7 +162,7 @@ def read_event_list(datafile):
     with open(datafile, 'r') as data:
         schedule_str = data.read()
 
-    days = [(lambda d: (d[0], markdown(d[1])))(s.split('\n',1)) 
+    days = [(lambda d: (d[0], markdown(d[1])))(s.split('\n',1))
             for s in schedule_str.split('\n## ')]
 
     # The first line will start with ## .  Remove it:
