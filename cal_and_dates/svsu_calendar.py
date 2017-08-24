@@ -66,6 +66,10 @@ def get_calendar_table(url, fixfun=None):
                 key = unidecode(cell.getText())
             elif i < colcnt:
                 #dates = unicodedata.normalize("NFKD",cell.getText()).strip(" ")
+                # Strip stupid comments they sometimes put in there
+                stupid = cell.find("strong")
+                if stupid:
+                    _ = stupid.extract()
                 dates = unidecode(cell.getText()).strip(" ")
                 if dates != "":
                     daterange = parse(dates)
