@@ -9,7 +9,10 @@ def get_classes_schedule(instructor):
     intructor's user name here."""
     url = URLBASE.format(instructor)
 
-    driver = webdriver.PhantomJS()
+    options = webdriver.ChromeOptions()
+    options.add_argument('headless')
+
+    driver = webdriver.Chrome(chrome_options = options)
     driver.get(url)
     page = bs4.BeautifulSoup(driver.page_source, "lxml")
     driver.quit()
