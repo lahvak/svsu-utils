@@ -3,6 +3,7 @@ Scraps important semester dates from SVSU registrars calendar webpage
 """
 from warnings import warn
 from datetime import datetime, timedelta
+from string import whitespace
 import requests
 import bs4
 #import unicodedata
@@ -70,7 +71,7 @@ def get_calendar_table(url, fixfun=None):
                 stupid = cell.find("strong")
                 if stupid:
                     _ = stupid.extract()
-                dates = unidecode(cell.getText()).strip(" ")
+                dates = unidecode(cell.getText()).strip(whitespace)
                 if dates != "":
                     daterange = parse(dates)
                     semesters[colnames[i]][key] = fixfun(daterange)
