@@ -1,7 +1,15 @@
+#!/usr/bin/env python3
+import argparse
 from svsu_calendar import get_semester_data
 from yaml import dump
 
-SEMESTER = "Fall"
+parser = argparse.ArgumentParser()
+parser.add_argument("semester")
+parser.add_argument("year", type=int)
+args = parser.parse_args()
+
+SEMESTER = args.semester
+YEAR = args.year
 
 UNWANTED_EVENTS = [
         "Commencement",
@@ -25,5 +33,5 @@ def semester_to_yaml(semester):
 
 with open("holidays.yaml", "w") as yf:
     dump(semester_to_yaml(
-        get_semester_data(SEMESTER)), yf, default_flow_style=False
+        get_semester_data(SEMESTER, YEAR)), yf, default_flow_style=False
         )

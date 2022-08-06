@@ -1,6 +1,13 @@
+#!/usr/bin/env python3
+import argparse
 from yaml import load, SafeLoader as Loader
 from datetime import timedelta
 from pylatex.utils import escape_latex
+
+parser = argparse.ArgumentParser(
+        description="Read holidays from `holidays.yaml` and prints LaTeX calendar to stdout."
+        )
+args = parser.parse_args()
 
 
 def daterangeIncl(first, last):
