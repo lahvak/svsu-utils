@@ -1,115 +1,116 @@
 """
 Scraps important semester dates from SVSU registrars calendar webpage
 """
-from warnings import warn
-from datetime import datetime, timedelta
-from string import whitespace
+from datetime import datetime
 import requests
 import bs4
-#import unicodedata
-from unidecode import unidecode
-from dateutil.relativedelta import relativedelta
+import re
 from daterangeparser import parse
 
-CAL_BASE = "http://www.svsu.edu/officeoftheregistrar/calendarimportantdates/importantdates/"
-FALL_WINTER_URL = CAL_BASE + "fallwinter/"
-SPRING_SUMMER_URL = CAL_BASE + "springsummer/"
+URL = "https://www.svsu.edu/academicandstudentaffairs/calendar/academiccalendar/"
 
-def extract_table_parts(page):
-    """Extract head and body from the calendar table on the given page."""
-    # Find the calendar table
-    tables = page.select("table")
-    if len(tables) == 0:
-        raise RuntimeError("There are no tables on this page.")
-    if len(tables) > 1:
-        warn("There are more tables on the page.  I will use the first one.")
-    cal_table = tables[0] # It seems to be the only table on the page
-    headlist = cal_table.find_all("thead")
+# It seems like this should be as easy as extracting all table rows that have
+# an attribute "headers" with value that is the semester in question, but
+# whoever coded this page was an idiot and the rows are weirdly mislabeled. For
+# example Fall 2021 id labeled as "fall2021", but all other fall semesters are
+# labeled as "fall2022" regardless of the year...
+
+
+def match_table(row, regexp):
+    headlist = row.find_all("thead")
     if len(headlist) == 0:
-        raise RuntimeError("The table I found does not seem to have a head.")
-    if len(headlist) > 1:
-        warn("This table has more than one head.")
+        return False
     head = headlist[0]
-    bodylist = cal_table.find_all("tbody")
-    if len(bodylist) == 0:
-        raise RuntimeError("The table I found does not seem to have a body.")
-    if len(bodylist) > 1:
-        warn("This table has more than one body.")
-    body = bodylist[0]
+    cells = head.find_all("th")
+    if len(cells) == 0:
+        return False
 
-    return head, body
+    if regexp.match(cells[0].getText()) is None:
+        return False
 
-def get_calendar_table(url, fixfun=None):
+    return True
+
+
+def semester_regex(semester, year):
+    regstr = "{}\\s{{1,}}{}".format(semester.upper(), year)
+    return re.compile(regstr)
+
+
+def find_table(page, semester, year):
+    """
+    Extract body from the calendar table on the given page.
+    It will give you the whole freaking academic year!
+    You will need to filter it more.
+    """
+    # Find the calendar table
+    tables = page.find_all("table")
+    # The page was really coded by an idiot!
+    semester = semester.upper()
+    if semester != "FALL":
+        semester = "FALL"
+        year = year - 1
+    regexp = semester_regex(semester, year)
+    for t in tables:
+        if match_table(t, regexp):
+            return t.find("tbody")
+
+    raise RuntimeError("Could not find a calendar table for {} {}".format(
+        semester, year))
+
+
+def parse_row(row):
+    headers = row.find_all("th")
+    data = row.find_all("td")
+    if len(headers) == 0:
+        event = ""
+    else:
+        event = headers[0].getText().strip()
+
+    if len(data) < 2:
+        dates = ""
+    else:
+        dates = data[1].getText().strip()
+
+    if dates:
+        dates = parse(dates)
+
+    return {'event': event, 'dates': dates}
+
+
+def match_row(row, semesterreg):
+    return len(row.find_all("th", headers=semesterreg)) > 0
+
+
+def get_calendar_table(url, semester, year):
     """
     Scraps calendar info from the given url.  You can pass a function that
     fixes bad date ranges.
     """
 
-    if fixfun is None:
-        fixfun = lambda rg: rg
-
     res = requests.get(url)
     res.raise_for_status()
     calendar_page = bs4.BeautifulSoup(res.text, "lxml")
 
-    head, body = extract_table_parts(calendar_page)
+    body = find_table(calendar_page, semester, year)
 
-    # Parse the table into dict of dicts, one for each semester:
-    colnames = [col.getText() for col in head.find_all("th")]
-    colcnt = len(colnames)
+    semesterreg = re.compile(semester.lower())
 
-    semesters = {s:{} for s in colnames[1:]}
+    return [parse_row(row) for row in body.find_all("tr")
+            if match_row(row, semesterreg)]
 
-    for row in body.find_all("tr"):
-        for i, cell in enumerate(row.find_all("td")):
-            if i == 0:
-                #key = unicodedata.normalize("NFKD",cell.getText())
-                key = unidecode(cell.getText())
-            elif i < colcnt:
-                #dates = unicodedata.normalize("NFKD",cell.getText()).strip(" ")
-                # Strip stupid comments they sometimes put in there
-                stupid = cell.find("strong")
-                if stupid:
-                    _ = stupid.extract()
-                dates = unidecode(cell.getText()).strip(whitespace)
-                if dates != "":
-                    daterange = parse(dates)
-                    semesters[colnames[i]][key] = fixfun(daterange)
-
-    return semesters
-
-def fix_stupid_range(daterange):
-    """Fix STUPID ranges from SVSU calendar, like Aug 29-2"""
-    if daterange[1] is not None:
-        delta = daterange[1] - daterange[0]
-        if delta > timedelta(days=300):
-            daterange = (daterange[0] + relativedelta(years=1),
-                         daterange[1] + relativedelta(months=1))
-    return daterange
 
 def get_semester_data(semester, year=None):
     """Gets data on a single semester"""
-    if semester == "Fall" or semester == "Winter":
-        url = FALL_WINTER_URL
-    elif semester == "Spring" or semester == "Summer":
-        url = SPRING_SUMMER_URL
-    else:
-        raise ValueError("Invalid semester: {}".format(semester))
 
     if year is None:
         year = datetime.now().year
 
-    key = "{} {}".format(semester, year)
+    rows = get_calendar_table(URL, semester, year)
 
-    semesters = get_calendar_table(url, fix_stupid_range)
-
-    if key in semesters:
-        return semesters[key]
-
-    warn("No info for {} semester!".format(key))
-    return {}
+    return {row['event']: row['dates'] for row in rows if row['event']}
 
 # A convenience function for printing:
+
 
 def date_range_str(daterange, fmt=None):
     """String with a single date is second is None, or range"""
@@ -119,4 +120,3 @@ def date_range_str(daterange, fmt=None):
         return daterange[0].strftime(fmt)
     else:
         return daterange[0].strftime(fmt) + " to " + daterange[1].strftime(fmt)
-
