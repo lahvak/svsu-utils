@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+import argparse
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from time import sleep
+from final_exams import find_time
+import sys
+
+URLBASE = "https://colss-prod.ec.svsu.edu/Student/Courses"
+
+
+parser = argparse.ArgumentParser(
+        description="Get instructor's schedule from website"
+        )
+parser.add_argument(
+        "instructor",
+        help="Name as listed on the website, typically in 'Smith, J' format"
+        )
+parser.add_argument("semester", help="Fall, Winter, Spring, Summer")
+parser.add_argument("year", type=int, help="Full year")
+args = parser.parse_args()
+
+SEM = "{} {}".format(args.semester, args.year)
+INSTR = args.instructor
+
+
+def course_search(headless=True):
+    options = webdriver.ChromeOptions()
+    if headless:
+        options.add_argument('headless')
+    driver = webdriver.Chrome(options=options)
+    driver.get(URLBASE + "/Search")
+    sleep(5)
+    return driver
+
+
+def select_instructor(driver, name):
+    try:
+        ass = driver.find_element_by_link_text("Show All Instructors")
+    except NoSuchElementException:
+        print("Cannot show all instructors")
+        sys.exit()
+    ass.click()
+    sleep(2)
+    try:
+        ass = driver.find_element_by_xpath(
+            "//label[contains(text(),'{}')]".format(name))
+    except NoSuchElementException:
+        print("Cannot find instructor " + name)
+        sys.exit()
+    ass.click()
+    sleep(2)
+
+
+def select_nonexpandable(driver, label):
+    try:
+        ass = driver.find_element_by_xpath(
+            "//label[contains(text(),'{}')]".format(label))
+    except NoSuchElementException:
+        print("Cannot find element labeled " + label)
+        sys.exit()
+    ass.click()
+    sleep(2)
+
+
+def expand_all_courses(driver):
+    try:
+        cours_ul = driver.find_element_by_id("course-resultul")
+    except NoSuchElementException:
+        print("Cannot find course list")
+        sys.exit()
+    courses = cours_ul.find_elements_by_class_name("esg-collapsible-group")
+    for c in courses:
+        c.click()
+        sleep(1)
+
+    return courses
+
+
+def process_row(row):
+    cells = row.find_elements_by_tag_name("td")
+    if len(cells) < 4:
+        print("Not enough cells in this row")
+        sys.exit()
+    seats = cells[0].text
+    time = cells[1].text
+    locashun = cells[2].text
+    instructours = cells[3].text
+
+    return {
+        'seats': seats,
+        'time': time,
+        'locashun': locashun,
+        'instructours': instructours
+    }
+
+
+def process_section(sec):
+    try:
+        caption = sec.find_element_by_tag_name("caption")
+    except NoSuchElementException:
+        print("Cannot find caption")
+        sys.exit()
+    caption = caption.get_attribute("textContent")
+
+    # Get all the visible rows except the first one which is a header
+    rows = [process_row(r) for r in sec.find_elements_by_tag_name("tr")[1:]
+            if r.is_displayed()]
+
+    return {'caption': caption, 'rows': rows}
+
+
+def extract_all_sections(courses):
+    return [process_section(sec) for c in courses
+            for sec in c.find_elements_by_tag_name("table")]
+
+
+def us_to_sane_time(ustime):
+    """
+    Gets a time in 00:00 *M format and returns a sane 24 hour one
+    Does not deal with midnight as there are no classes at midnight
+    so 12 am and 12 pm will all result in noon.
+    """
+
+    parts = ustime.split()
+    if len(parts) != 2:
+        error("invalid time format")
+    moparts = parts[0].split(":")
+    if len(moparts) != 2:
+        error("invalid time format")
+    if (parts[1].upper() == "AM") or (moparts[0] == "12"):
+        return parts[0]
+
+    return "{}:{}".format(int(moparts[0]) + 12, moparts[1])
+
+
+def strip_section(section):
+    """
+    Gets useful info for one section, returns a dict.
+    """
+
+    if section['caption']:
+        caption = section['caption'].splitlines()[0].replace("*", "-")
+    else:
+        caption = ""
+
+    loc = section['rows'][0]['locashun'].splitlines()[0].replace("SVSU Main Campus, ", "")
+
+    time = section['rows'][0]['time'].splitlines()[0]
+    time_split = time.split(" ", 1)
+    days = time_split[0].split("/")
+    times = [us_to_sane_time(time) for time in time_split[1].split(" - ")]
+
+    return {'caption': caption, 'loc': loc, 'days': days,
+            'start': times[0], 'end': times[1]}
+
+
+def get_useful_info(instructor, semester):
+    """
+    Gets the info for the instructor and semester in a
+    useful format.  Returns a list of dicts.
+    """
+
+    with course_search(headless=True) as driver:
+        select_instructor(driver, instructor)
+        select_nonexpandable(driver, semester)
+        courses = expand_all_courses(driver)
+        sections = extract_all_sections(courses)
+        return [strip_section(section) for section in sections]
+
+
+def abbreviate_building(locashun):
+    abbreviations = {
+            'Science East': 'SE',
+            'Science West': 'SW',
+            'Wickes Hall': 'W',
+            'Pioneer Hall': 'P',
+            'Zahnow Library': 'Z',
+            }
+
+    for old, new in abbreviations.items():
+        if old in locashun:
+            return locashun.replace(old, new)
+
+        return locashun
+
+
+def tex_schedule_string(section):
+    """
+    Converts a section info to a TeX formatted string
+    """
+
+    return "\\class{{{}}}{{{}}}{{{}}}{{{}-{}}}".format(
+        section['caption'],
+        abbreviate_building(section['loc']),
+        ','.join(section['days']),
+        section['start'],
+        section['end']
+        )
+
+
+def days_to_str(days):
+    """
+    Converts list of days to a string, replacing Th with R.
+    """
+
+    return "".join("R" if day == "Th" else day for day in days)
+
+
+def print_info(instructor, semester):
+    """
+    Prints semester information for one instructor.
+    """
+
+    info = get_useful_info(instructor, semester)
+
+    print("\nInstructor: {}\n".format(instructor))
+
+    for section in info:
+        print(tex_schedule_string(section))
+
+    print("\nFinal Exams:\n")
+
+    for section in info:
+        day, slot = find_time(days_to_str(section['days']), section['start'])
+        print(section['caption'] + ": " + day + " " + slot)
+
+
+print_info(INSTR, SEM)
