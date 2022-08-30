@@ -214,16 +214,25 @@ def print_info(instructor, semester):
 
     info = get_useful_info(instructor, semester)
 
-    print("\nInstructor: {}\n".format(instructor))
+    print(
+        "\n\\begin{{center}}\n\\Large {}\n\\end{{center}}\n"
+        .format(instructor))
+
+    print("\n\\begin{schedule}[]%")
 
     for section in info:
         print(tex_schedule_string(section))
 
-    print("\nFinal Exams:\n")
+    print("\\end{schedule}%\n")
+
+    print("\n\\subsection*{Final Exams:}\n")
+    print("\n\\begin{description}")
 
     for section in info:
         day, slot = find_time(days_to_str(section['days']), section['start'])
-        print(section['caption'] + ": " + day + " " + slot)
+        print("\\item[{}:] {} {}".format(section['caption'], day, slot))
+
+    print("\\end{description}\n")
 
 
 print_info(INSTR, SEM)
