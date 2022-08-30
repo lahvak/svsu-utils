@@ -1,4 +1,4 @@
-from yaml import load
+from yaml import safe_load
 
 # This was extracted from a pdf table downloaded from registrars website.  Lots
 # of hand reformating was done to make it uniform and parseable.  That means
@@ -62,20 +62,24 @@ Friday:
    - WF, F at 20 or 20:30
 """
 
-data = load(yaml_data)
+data = safe_load(yaml_data)
+
 
 def time_to_minutes(time):
     l = [int(s) for s in time.split(":")]
     return 60*l[0] + (l[1] if len(l) > 1 else 0)
+
 
 def parse(v):
     l = [c.split(" at ") for c in v.split(" OR ")]
     l = [{'days': s[0].split(", "), 'times': [time_to_minutes(t) for t in s[1].split(" or ")]} for s in l]
     return(l)
 
+
 slots = data["Slots"]
 
 days = {day: [parse(v) for v in vals] for day, vals in data.items() if day != "Slots"}
+
 
 def find_time(ds, t):
     time = time_to_minutes(t)
@@ -87,14 +91,3 @@ def find_time(ds, t):
                     return day, slots[i]
 
     return None, None
-
-classes = {
-    "103": ("TR", "10:30"),
-    "120A": ("TR", "12:30"),
-    "140": ("MW", "10:30"),
-    "261": ("TR", "19"),
-}
-
-for k, v in classes.items():
-    ex = find_time(*v)
-    print("{}: {} at {}".format(k, ex[0], ex[1]))
