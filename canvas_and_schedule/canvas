@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+import canvas
+import canvas_utils.course_conf as cnf
+import argparse
+import subprocess
+import sys
+from os import chdir, path
+
+BROWSER = "firefox"
+
+URL = "https://canvas.svsu.edu/courses/{}"
+
+COURSEDIR = "~/Classes/"
+
+
+parser = argparse.ArgumentParser(
+    description="Open course website in a browser"
+)
+parser.add_argument('course', nargs='?', default=None,
+                    help="Course to open."
+                    "Defaults to current course when in a course directory.\n"
+                    "Must be one of courses in {}.".format(COURSEDIR))
+parser.add_argument('--page', dest="page", default=None,
+                    help="Specific page to open")
+parser.add_argument('--browser', dest="browser", default=BROWSER,
+                    help="Which browser to use. Defaults to firefox.")
+
+args = parser.parse_args()
+
+PAGE = "" if args.page is None else "/{}".format(args.page)
+
+canvas.read_access_token()
+
+if args.course is not None:
+    try:
+        chdir(path.expanduser(COURSEDIR + args.course))
+    except FileNotFoundError:
+        print("Could not find course {}!".format(args.course))
+        sys.exit(1)
+
+try:
+    config = cnf.get_course_config()
+except FileNotFoundError:
+    print("Cannot find a course config file.\n"
+          "Perhaps you are not in a course directory?")
+    sys.exit(1)
+
+for classid in config['sections']:
+    subprocess.run([args.browser, URL.format(classid) + PAGE])
