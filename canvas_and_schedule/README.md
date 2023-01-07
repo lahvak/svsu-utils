@@ -5,6 +5,8 @@
 *  `canvas_post_announcement`: a script that posts an announcement from a markdown file
    to a Canvas site
 
+*  `canvas_get_roster`: a script that obtains the student roster in csv format
+
 *  `parse_schedule.py`: module that reads info from a markdown schedule file
    and from holiday list, and produces a schedule for the semester. Optionally,
    posts the schedule to canvas.

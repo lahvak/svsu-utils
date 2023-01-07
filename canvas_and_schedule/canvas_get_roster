@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""
+Gets a roster of all students in the current course (all sections).
+For example, the following shell command will produce a comma separated list of
+all emails:
+
+`canvas_get_roster | csvtool namedcol email - | tail -n +2 | paste -sd ","`
+
+It adds the section number as an extra column.
+"""
+import canvas
+import canvas_utils.course_conf as cnf
+import csv
+import sys
+
+config = cnf.get_course_config()
+
+canvas.read_access_token()
+
+
+COLUMNS = [
+        'id',
+        'name',
+        'sortable_name',
+        'short_name',
+        'sis_user_id',
+        'login_id',
+        'pronouns',
+        'email',
+        'section'
+        ]
+
+writer = csv.DictWriter(sys.stdout, fieldnames=COLUMNS, extrasaction='ignore')
+
+writer.writeheader()
+
+for classid in config['sections']:
+    section = config['sections'][classid]['secnum']
+    students = canvas.get_students(classid)
+
+    for stud in students:
+        stud['section'] = section
+        writer.writerow(stud)
