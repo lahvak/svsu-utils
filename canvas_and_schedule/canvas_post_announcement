@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""
+This posts an announcement to all sections of the current course. The title and
+text of the announcement is taken from the supplied file.
+The file must be a markdown file with a YAML block which contains the title.
+"""
+import yaml
+import canvas
+import canvas_utils.course_conf as cnf
+import argparse
+
+parser = argparse.ArgumentParser(
+    description="Post an announcement from a markdown file"
+)
+parser.add_argument('file', help="Markdown file. "
+                    "Must include a YAML header with title field")
+
+args = parser.parse_args()
+
+config = cnf.get_course_config()
+
+file = args.file
+
+canvas.read_access_token()
+
+with open(file, 'r') as f:
+    line = f.readline()
+    if not line.startswith("---"):
+        raise ValueError("YAML block missing!")
+    yblock = []
+    line = f.readline()
+    while not line.startswith("---"):
+        yblock += [line]
+        line = f.readline()
+
+    content = f.read()
+
+yam = yaml.safe_load("".join(yblock))
+
+title = yam['title']
+
+for classid in config['sections']:
+    print(canvas.post_announcement_from_markdown(classid, title, content,
+                                                 use_pandoc=True))

@@ -79,13 +79,20 @@ def expand_all_courses(driver):
 
 def process_row(row):
     cells = row.find_elements_by_tag_name("td")
-    if len(cells) < 4:
-        print("Not enough cells in this row")
+    if len(cells) == 4:
+        seats = cells[0].text
+        time = cells[1].text
+        locashun = cells[2].text
+        instructours = cells[3].text
+    elif len(cells) == 2:
+        seats = None
+        time = cells[0].text
+        locashun = cells[1].text
+        instructours = None
+    else:
+        print("Weird number of cells in this row!")
+        print(len(cells))
         sys.exit()
-    seats = cells[0].text
-    time = cells[1].text
-    locashun = cells[2].text
-    instructours = cells[3].text
 
     return {
         'seats': seats,
@@ -161,7 +168,7 @@ def get_useful_info(instructor, semester):
     useful format.  Returns a list of dicts.
     """
 
-    with course_search(headless=True) as driver:
+    with course_search(headless=False) as driver:
         select_instructor(driver, instructor)
         select_nonexpandable(driver, semester)
         courses = expand_all_courses(driver)
