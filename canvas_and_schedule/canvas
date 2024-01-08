@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import canvas
 import canvas_utils.course_conf as cnf
 import argparse
 import subprocess
@@ -29,8 +28,6 @@ parser.add_argument('--browser', dest="browser", default=BROWSER,
 args = parser.parse_args()
 
 PAGE = "" if args.page is None else "/{}".format(args.page)
-
-canvas.read_access_token()
 
 if args.course is not None:
     try:
