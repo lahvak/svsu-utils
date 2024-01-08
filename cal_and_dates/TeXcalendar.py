@@ -86,6 +86,54 @@ def cal_days(days):
     return caldays + "\\skipday\\skipday"
 
 
+def calendar_text(command, text, escape=False):
+    """
+    takes a command string (either \\caltexton{i} or \\caltextnext)
+    and text and creates a calendar day. The text must be in TeX format,
+    if it is not, set `escape` to True.
+    """
+
+    if escape:
+        text = escape_latex(text)
+
+    return command + "{" + text + "}"
+
+
+def calday_text(n, text, escape=False):
+    """
+    takes the day number (from 1) and text
+    and creates a calendar day. The text must be in TeX format,
+    if it is not, set `escape` to True.
+    """
+
+    return calendar_text(f"\\caltexton{{{n}}}", text, escape)
+
+
+def calnext_text(text, escape=False):
+    """
+    Takes a text and creates a next calendar day.
+    The text must be in TeX format, if it is not, set `escape` to True.
+    """
+
+    return calendar_text("\\caltextnext", text, escape)
+
+
+def list_to_days(texts, escape=False):
+    """
+    Takes a list of calendar texts and creates a sequence of
+    \\caltexton's and \\caltexnexts. The texts must be in TeX
+    format, or `escape` must be set.
+    """
+
+    if not texts:
+        return ""
+
+    contents = [calday_text(1, texts[0], escape)]
+    contents += [calnext_text(t, escape) for t in texts[1:]]
+
+    return "\n".join(contents)
+
+
 def preamble(holidays):
     """
     Returns TeX preamble for calendar.
@@ -103,10 +151,10 @@ def preamble(holidays):
 """ + format_holidays(holidays)
 
 
-def calendar(start, end, days, classes=None):
+def calendar(start, end, days, contents=None):
     """
     Creates a TeX calendar starting at `start`, ending at `end`, with days
-    of week specified in `days`, with optional list of contents for
+    of week specified in `days`, with optional contents for
     classes, in TeX format.
     """
 
@@ -124,8 +172,8 @@ def calendar(start, end, days, classes=None):
             cal_days(days),
             caltext(start, "Classes Start"),
             caltext(end, "Classes End"),
-            "\\Holidays\n"
-            "" if classes is None else classes,
+            "\\Holidays\n",
+            "" if contents is None else contents,
             r"\end{calendar}",
             r"\end{center}"
         ])
