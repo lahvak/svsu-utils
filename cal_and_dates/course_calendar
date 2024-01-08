@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+import pypandoc
+import argparse
+import canvas_utils.course_conf as cnf
+import sys
+from os import chdir, path
+from TeXcalendar import (
+    BEGIN_DOCUMENT,
+    END_DOCUMENT,
+    preamble,
+    calendar,
+    get_dates,
+    list_to_days
+)
+
+COURSEDIR = "~/Classes/"
+
+
+parser = argparse.ArgumentParser(
+    description="Generate LaTeX code for a term calendar for a given course."
+)
+parser.add_argument('planfile', nargs='?', default=None,
+                    help="Course plan file.\n"
+                    "Must be in Markdown format, with each level 2 header "
+                    "corresponding to one day. Anything under level 3 or higher "
+                    "is ignored and can be used for notes etc.\n"
+                    "If not provided, an empty calendar is produced.")
+parser.add_argument('--course', dest="course", default=None,
+                    help="Course designation.\n"
+                    "Defaults to current course when in a course directory.\n"
+                    "Must be one of courses in {}.".format(COURSEDIR))
+
+
+def filter_lines(lines):
+    """
+    keep only lines if level == 2
+    """
+    outlines = []
+    level = 0
+
+    for line in lines:
+        if line[:3] == "## ":
+            level = 2
+        elif line[:3] == "###":
+            level = 3
+
+        if level == 2:
+            outlines += [line]
+
+    return outlines
+
+
+def split_to_days(tex):
+    """
+    Split TeX code into days on \\subsections
+    """
+    days = tex.split("\\subsection")
+
+    return [("\\textbf" + day).strip() for day in days[1:]]
+
+
+def days_from_plan(planfile):
+    """
+    Reads in planfile, filter lines and convert to list of days
+    """
+    with open(planfile, 'r') as events:
+        lines = events.readlines()
+
+    goodlines = filter_lines(lines)
+    md = "".join(goodlines)
+    tex = pypandoc.convert_text(
+        md, 'latex', format='markdown-auto_identifiers')
+
+    return split_to_days(tex)
+
+
+TIGHTLIST = r"""
+\def\tightlist{\setlength{\itemsep}{0pt}%
+\setlength{\parskip}{0pt}}
+"""
+
+args = parser.parse_args()
+
+planfile = args.planfile
+if planfile is None:
+    days = None
+else:
+    texts = days_from_plan(planfile)
+    days = list_to_days(texts)
+
+
+if args.course is not None:
+    try:
+        chdir(path.expanduser(COURSEDIR + args.course))
+    except FileNotFoundError:
+        print("Could not find course {}!".format(args.course))
+        sys.exit(1)
+
+try:
+    config = cnf.get_course_config()
+except FileNotFoundError:
+    print("Cannot find a course config file.\n"
+          "Perhaps you are not in a course directory?")
+    sys.exit(1)
+
+holidays = config['dates']
+(start, end, holidays) = get_dates(holidays)
+
+for section in config['sections']:
+    print("\n".join([
+        preamble(holidays),
+        TIGHTLIST,
+        BEGIN_DOCUMENT,
+        calendar(start, end, config['sections'][section]['days'], contents=days),
+        END_DOCUMENT
+    ]))
