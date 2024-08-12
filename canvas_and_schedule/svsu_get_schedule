@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
 import argparse
+import sys
+from time import sleep
+
+from final_exams import find_time
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
-from time import sleep
-from final_exams import find_time
-import sys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 
-URLBASE = "https://colss-prod.ec.svsu.edu/Student/Courses"
+URLBASE = 'https://colss-prod.ec.svsu.edu/Student/Courses'
 
 
 parser = argparse.ArgumentParser(
-        description="Get instructor's schedule from website"
-        )
+    description="Get instructor's schedule from website"
+)
 parser.add_argument(
-        "instructor",
-        help="Name as listed on the website, typically in 'Smith, J' format"
-        )
-parser.add_argument("semester", help="Fall, Winter, Spring, Summer")
-parser.add_argument("year", type=int, help="Full year")
+    'instructor',
+    help="Name as listed on the website, typically in 'Smith, J' format",
+)
+parser.add_argument('semester', help='Fall, Winter, Spring, Summer')
+parser.add_argument('year', type=int, help='Full year')
 args = parser.parse_args()
 
-SEM = "{} {}".format(args.semester, args.year)
+SEM = '{} {}'.format(args.semester, args.year)
 INSTR = args.instructor
 
 
@@ -28,36 +32,45 @@ def course_search(headless=True):
     options = webdriver.ChromeOptions()
     if headless:
         options.add_argument('headless')
+    options.add_argument('user-data-dir=/home/lahvak/.selenium')
     driver = webdriver.Chrome(options=options)
-    driver.get(URLBASE + "/Search")
-    sleep(5)
+    driver.get(URLBASE + '/Search')
+    # wait = WebDriverWait(driver, timeout=1200)
+    # wait.until(EC.presence_of_element_located((By.ID, 'submit-course-search')))
     return driver
 
 
 def select_instructor(driver, name):
     try:
-        ass = driver.find_element_by_link_text("Show All Instructors")
+        ass = driver.find_element(By.ID, 'showallfaculties')
     except NoSuchElementException:
-        print("Cannot show all instructors")
+        print('Cannot show all instructors')
         sys.exit()
-    ass.click()
+    print('About to click on show all faculty')
+    WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.ID, 'showallfaculties'))
+    ).click()
+    print('Clicked on show all faculty')
     sleep(2)
     try:
-        ass = driver.find_element_by_xpath(
-            "//label[contains(text(),'{}')]".format(name))
+        ass = driver.find_element(
+            'xpath', "//label[contains(text(),'{}')]".format(name)
+        )
     except NoSuchElementException:
-        print("Cannot find instructor " + name)
+        print('Cannot find instructor ' + name)
         sys.exit()
+    sleep(5)
     ass.click()
     sleep(2)
 
 
 def select_nonexpandable(driver, label):
     try:
-        ass = driver.find_element_by_xpath(
-            "//label[contains(text(),'{}')]".format(label))
+        ass = driver.find_element(
+            'xpath', "//label[contains(text(),'{}')]".format(label)
+        )
     except NoSuchElementException:
-        print("Cannot find element labeled " + label)
+        print('Cannot find element labeled ' + label)
         sys.exit()
     ass.click()
     sleep(2)
@@ -65,11 +78,11 @@ def select_nonexpandable(driver, label):
 
 def expand_all_courses(driver):
     try:
-        cours_ul = driver.find_element_by_id("course-resultul")
+        cours_ul = driver.find_element(By.ID, 'course-resultul')
     except NoSuchElementException:
-        print("Cannot find course list")
+        print('Cannot find course list')
         sys.exit()
-    courses = cours_ul.find_elements_by_class_name("esg-collapsible-group")
+    courses = cours_ul.find_elements(By.CLASS_NAME, 'esg-collapsible-group')
     for c in courses:
         c.click()
         sleep(1)
@@ -78,7 +91,7 @@ def expand_all_courses(driver):
 
 
 def process_row(row):
-    cells = row.find_elements_by_tag_name("td")
+    cells = row.find_elements(By.TAG_NAME, 'td')
     if len(cells) == 4:
         seats = cells[0].text
         time = cells[1].text
@@ -90,7 +103,7 @@ def process_row(row):
         locashun = cells[1].text
         instructours = None
     else:
-        print("Weird number of cells in this row!")
+        print('Weird number of cells in this row!')
         print(len(cells))
         sys.exit()
 
@@ -98,28 +111,34 @@ def process_row(row):
         'seats': seats,
         'time': time,
         'locashun': locashun,
-        'instructours': instructours
+        'instructours': instructours,
     }
 
 
 def process_section(sec):
     try:
-        caption = sec.find_element_by_tag_name("caption")
+        caption = sec.find_element(By.TAG_NAME, 'caption')
     except NoSuchElementException:
-        print("Cannot find caption")
+        print('Cannot find caption')
         sys.exit()
-    caption = caption.get_attribute("textContent")
+    caption = caption.get_attribute('textContent')
 
     # Get all the visible rows except the first one which is a header
-    rows = [process_row(r) for r in sec.find_elements_by_tag_name("tr")[1:]
-            if r.is_displayed()]
+    rows = [
+        process_row(r)
+        for r in sec.find_elements(By.TAG_NAME, 'tr')[1:]
+        if r.is_displayed()
+    ]
 
     return {'caption': caption, 'rows': rows}
 
 
 def extract_all_sections(courses):
-    return [process_section(sec) for c in courses
-            for sec in c.find_elements_by_tag_name("table")]
+    return [
+        process_section(sec)
+        for c in courses
+        for sec in c.find_elements(By.TAG_NAME, 'table')
+    ]
 
 
 def us_to_sane_time(ustime):
@@ -131,14 +150,14 @@ def us_to_sane_time(ustime):
 
     parts = ustime.split()
     if len(parts) != 2:
-        error("invalid time format")
-    moparts = parts[0].split(":")
+        sys.error('invalid time format')
+    moparts = parts[0].split(':')
     if len(moparts) != 2:
-        error("invalid time format")
-    if (parts[1].upper() == "AM") or (moparts[0] == "12"):
+        sys.error('invalid time format')
+    if (parts[1].upper() == 'AM') or (moparts[0] == '12'):
         return parts[0]
 
-    return "{}:{}".format(int(moparts[0]) + 12, moparts[1])
+    return '{}:{}'.format(int(moparts[0]) + 12, moparts[1])
 
 
 def strip_section(section):
@@ -147,19 +166,28 @@ def strip_section(section):
     """
 
     if section['caption']:
-        caption = section['caption'].splitlines()[0].replace("*", "-")
+        caption = section['caption'].splitlines()[0].replace('*', '-')
     else:
-        caption = ""
+        caption = ''
 
-    loc = section['rows'][0]['locashun'].splitlines()[0].replace("SVSU Main Campus, ", "")
+    loc = (
+        section['rows'][0]['locashun']
+        .splitlines()[0]
+        .replace('SVSU Main Campus, ', '')
+    )
 
     time = section['rows'][0]['time'].splitlines()[0]
-    time_split = time.split(" ", 1)
-    days = time_split[0].split("/")
-    times = [us_to_sane_time(time) for time in time_split[1].split(" - ")]
+    time_split = time.split(' ', 1)
+    days = time_split[0].split('/')
+    times = [us_to_sane_time(time) for time in time_split[1].split(' - ')]
 
-    return {'caption': caption, 'loc': loc, 'days': days,
-            'start': times[0], 'end': times[1]}
+    return {
+        'caption': caption,
+        'loc': loc,
+        'days': days,
+        'start': times[0],
+        'end': times[1],
+    }
 
 
 def get_useful_info(instructor, semester):
@@ -178,12 +206,12 @@ def get_useful_info(instructor, semester):
 
 def abbreviate_building(locashun):
     abbreviations = {
-            'Science East': 'SE',
-            'Science West': 'SW',
-            'Wickes Hall': 'W',
-            'Pioneer Hall': 'P',
-            'Zahnow Library': 'Z',
-            }
+        'Science East': 'SE',
+        'Science West': 'SW',
+        'Wickes Hall': 'W',
+        'Pioneer Hall': 'P',
+        'Zahnow Library': 'Z',
+    }
 
     for old, new in abbreviations.items():
         if old in locashun:
@@ -197,13 +225,13 @@ def tex_schedule_string(section):
     Converts a section info to a TeX formatted string
     """
 
-    return "\\class{{{}}}{{{}}}{{{}}}{{{}-{}}}".format(
+    return '\\class{{{}}}{{{}}}{{{}}}{{{}-{}}}'.format(
         section['caption'],
         abbreviate_building(section['loc']),
         ','.join(section['days']),
         section['start'],
-        section['end']
-        )
+        section['end'],
+    )
 
 
 def days_to_str(days):
@@ -211,7 +239,7 @@ def days_to_str(days):
     Converts list of days to a string, replacing Th with R.
     """
 
-    return "".join("R" if day == "Th" else day for day in days)
+    return ''.join('R' if day == 'Th' else day for day in days)
 
 
 def print_info(instructor, semester):
@@ -222,24 +250,24 @@ def print_info(instructor, semester):
     info = get_useful_info(instructor, semester)
 
     print(
-        "\n\\begin{{center}}\n\\Large {}\n\\end{{center}}\n"
-        .format(instructor))
+        '\n\\begin{{center}}\n\\Large {}\n\\end{{center}}\n'.format(instructor)
+    )
 
-    print("\n\\begin{schedule}[]%")
+    print('\n\\begin{schedule}[]%')
 
     for section in info:
         print(tex_schedule_string(section))
 
-    print("\\end{schedule}%\n")
+    print('\\end{schedule}%\n')
 
-    print("\n\\subsection*{Final Exams:}\n")
-    print("\n\\begin{description}")
+    print('\n\\subsection*{Final Exams:}\n')
+    print('\n\\begin{description}')
 
     for section in info:
         day, slot = find_time(days_to_str(section['days']), section['start'])
-        print("\\item[{}:] {} {}".format(section['caption'], day, slot))
+        print('\\item[{}:] {} {}'.format(section['caption'], day, slot))
 
-    print("\\end{description}\n")
+    print('\\end{description}\n')
 
 
 print_info(INSTR, SEM)
