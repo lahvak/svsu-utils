@@ -12,8 +12,31 @@ URL = "https://www.svsu.edu/academicandstudentaffairs/calendar/academiccalendar/
 # It seems like this should be as easy as extracting all table rows that have
 # an attribute "headers" with value that is the semester in question, but
 # whoever coded this page was an idiot and the rows are weirdly mislabeled. For
-# example Fall 2021 id labeled as "fall2021", but all other fall semesters are
+# example Fall 2021 is labeled as "fall2021", but all other fall semesters are
 # labeled as "fall2022" regardless of the year...
+
+# Update in January 2025 - "The saga continues": This time it looks like all
+# fall semesters are labeled as "fall2025", including the 2024 one and 2026
+# one, while all non-fall semesters are labeled as ".*2026", again regardless
+# of actual year.
+#
+# It seems like the only way to handle this is:
+#
+# 1. Find the table for the correct academic year. It will have a thead in
+#    which the first cell contains the text "FALL ...." where .... is the year
+#    of the fall semester of that academic year.
+
+# 2. If we now restrict ourselves to that table only, there seems to be a way
+#    to identify which semester a row belongs to: most of them will have a cell
+#    that has a `header` attribute with, for example, "winter2026" for a winter
+#    semester (the 2026 is regardless of the actual year). Some don't, but
+#    these seem to have a cell with a `header` attribute that contains the name
+#    of the semester, but with an uppercase first letter. Hopefully these two
+#    cases cover everything.
+#
+# This would be so much easier if they would either put each semester in its
+# own table with clearly labeled header, or include in each row an attribute
+# that would uniquely indicate which semester does the row belong to.
 
 
 def match_table(row, regexp):
@@ -21,7 +44,7 @@ def match_table(row, regexp):
     if len(headlist) == 0:
         return False
     head = headlist[0]
-    cells = head.find_all("th")
+    cells = head.find_all("td")
     if len(cells) == 0:
         return False
 
@@ -38,6 +61,7 @@ def semester_regex(semester, year):
 
 def find_table(page, semester, year):
     """
+    Find the table for the academic year starting with FALL.
     Extract body from the calendar table on the given page.
     It will give you the whole freaking academic year!
     You will need to filter it more.
@@ -59,17 +83,13 @@ def find_table(page, semester, year):
 
 
 def parse_row(row):
-    headers = row.find_all("th")
     data = row.find_all("td")
-    if len(headers) == 0:
+    if len(data) < 3:
         event = ""
-    else:
-        event = headers[0].getText().strip()
-
-    if len(data) < 2:
         dates = ""
     else:
-        dates = data[1].getText().strip()
+        event = data[0].getText().strip()
+        dates = data[2].getText().strip()
 
     if dates:
         dates = parse(dates)
@@ -78,7 +98,7 @@ def parse_row(row):
 
 
 def match_row(row, semesterreg):
-    return len(row.find_all("th", headers=semesterreg)) > 0
+    return len(row.find_all("td", headers=semesterreg)) > 0
 
 
 def get_calendar_table(url, semester, year):
@@ -93,7 +113,7 @@ def get_calendar_table(url, semester, year):
 
     body = find_table(calendar_page, semester, year)
 
-    semesterreg = re.compile(semester.lower())
+    semesterreg = re.compile(semester.lower()[1:])
 
     return [parse_row(row) for row in body.find_all("tr")
             if match_row(row, semesterreg)]
