@@ -234,7 +234,8 @@ def abbreviate_building(locashun):
         if old in locashun:
             return locashun.replace(old, new)
 
-        return locashun
+    return locashun
+
 
 
 def tex_schedule_string(section):
