@@ -8,20 +8,24 @@ import yaml
 import canvas
 import canvas_utils.course_conf as cnf
 import argparse
+import sys
+from os import chdir, path
+
+COURSEDIR = "~/Classes/"
 
 parser = argparse.ArgumentParser(
     description="Post an announcement from a markdown file"
 )
 parser.add_argument('file', help="Markdown file. "
                     "Must include a YAML header with title field")
+parser.add_argument('--course', dest="course", default=None,
+                    help="Course to post to."
+                    "Defaults to current course when in a course directory.\n"
+                    "Must be one of courses in {}.".format(COURSEDIR))
 
 args = parser.parse_args()
 
-config = cnf.get_course_config()
-
 file = args.file
-
-canvas.read_access_token()
 
 with open(file, 'r') as f:
     line = f.readline()
@@ -38,6 +42,22 @@ with open(file, 'r') as f:
 yam = yaml.safe_load("".join(yblock))
 
 title = yam['title']
+
+if args.course is not None:
+    try:
+        chdir(path.expanduser(COURSEDIR + args.course))
+    except FileNotFoundError:
+        print("Could not find course {}!".format(args.course))
+        sys.exit(1)
+
+try:
+    config = cnf.get_course_config()
+except FileNotFoundError:
+    print("Cannot find a course config file.\n"
+          "Perhaps you are not in a course directory?")
+    sys.exit(1)
+
+canvas.read_access_token()
 
 for classid in config['sections']:
     print(canvas.post_announcement_from_markdown(classid, title, content,
