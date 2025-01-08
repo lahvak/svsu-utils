@@ -176,13 +176,24 @@ def strip_section(section):
     else:
         caption = ''
 
+    row = section['rows'][0]
+
+    # For hybrid classes, the first row does not contain any
+    # useful info. We will assume that all meetings happen at the
+    # same weekday, the same time, and the same location, and simply
+    # use the second row. It would be hard to create a weekly
+    # schedule if that was not true, anyway.
+
+    if "Hybrid" in row['locashun'] and len(section['rows']) > 1:
+        row = section['rows'][1]
+
     loc = (
-        section['rows'][0]['locashun']
+        row['locashun']
         .splitlines()[0]
         .replace('SVSU Main Campus, ', '')
     )
 
-    time = section['rows'][0]['time'].splitlines()[0]
+    time = row['time'].splitlines()[0]
     time_split = time.split(' ', 1)
     days = time_split[0].split('/')
     times = [us_to_sane_time(time) for time in time_split[1].split(' - ')]
