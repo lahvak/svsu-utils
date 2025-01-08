@@ -2,6 +2,7 @@
 import argparse
 import sys
 from time import sleep
+from string import ascii_uppercase
 
 from final_exams import find_time
 from selenium import webdriver
@@ -237,13 +238,21 @@ def abbreviate_building(locashun):
     return locashun
 
 
+def uppercase_letter():
+    for c in ascii_uppercase:
+        yield c
+
+
+UPLETTER = uppercase_letter()
+
 
 def tex_schedule_string(section):
     """
     Converts a section info to a TeX formatted string
     """
 
-    return '\\class{{{}}}{{{}}}{{{}}}{{{}-{}}}'.format(
+    return '\\class{}{{{}}}{{{}}}{{{}}}{{{}-{}}}'.format(
+        UPLETTER.__next__(),
         section['caption'],
         abbreviate_building(section['loc']),
         ','.join(section['days']),
@@ -260,6 +269,52 @@ def days_to_str(days):
     return ''.join('R' if day == 'Th' else day for day in days)
 
 
+TEX_HEADER1 = r"""
+\documentclass[10pt,letterpaper]{article}
+\usepackage{xcolor}
+\usepackage[left=1in, right=1in, top=.7in, bottom=.7in]{geometry}
+\pagestyle{empty}
+\thispagestyle{empty}
+\usepackage{schedule}
+
+\CellHeight{.6in}
+\CellWidth{1in}
+\TimeRange{"""
+
+TEX_HEADER2 = r"""}
+\SubUnits{30}
+\BeginOn{Monday}
+\TextSize{\small}
+\FiveDay
+\TwelveHour
+
+\NewAppointment{classA}{blue!25!white}{black}
+\NewAppointment{classB}{red!25!white}{black}
+\NewAppointment{classC}{green!25!white}{black}
+\NewAppointment{classD}{orange!50!white}{black}
+\NewAppointment{officehour}{darkgray}{white}
+
+\begin{document}
+"""
+
+
+def time_to_mins(time):
+    """
+    Convert from 24 hour time format to minutes.
+    """
+
+    return sum(l[0] * l[1] for
+               l in zip(map(int, time.split(':')), [60, 1]))
+
+
+def mins_to_time(minutes):
+    """
+    Convert minutes to 24 hour time format.
+    """
+
+    return "{}:{}".format(*divmod(minutes, 60))
+
+
 def print_info(instructor, semester):
     """
     Prints semester information for one instructor.
@@ -267,8 +322,26 @@ def print_info(instructor, semester):
 
     info = get_useful_info(instructor, semester)
 
+    lower_minutes = time_to_mins("12:00")
+    upper_minutes = time_to_mins("12:00")
+
+    for section in info:
+        start_mins = time_to_mins(section['start'])
+        end_mins = time_to_mins(section['end'])
+        if start_mins < lower_minutes:
+            lower_minutes = start_mins
+        if end_mins > upper_minutes:
+            upper_minutes = end_mins
+
+    lower_minutes -= 60
+    upper_minutes += 60
+
+    print(TEX_HEADER1, mins_to_time(lower_minutes), " - ",
+          mins_to_time(upper_minutes), TEX_HEADER2)
+
     print(
-        '\n\\begin{{center}}\n\\Large {}\n\\end{{center}}\n'.format(instructor)
+        '\n\\begin{{center}}\n{{\\Large {}}}\\\\\n{}\n\\end{{center}}\n'
+        .format(instructor, semester)
     )
 
     print('\n\\begin{schedule}[]%')
@@ -285,7 +358,7 @@ def print_info(instructor, semester):
         day, slot = find_time(days_to_str(section['days']), section['start'])
         print('\\item[{}:] {} {}'.format(section['caption'], day, slot))
 
-    print('\\end{description}\n')
+    print('\\end{description}\n\n\\end{document}')
 
 
 print_info(INSTR, SEM)
