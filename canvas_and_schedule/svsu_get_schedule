@@ -213,7 +213,7 @@ def get_useful_info(instructor, semester):
     useful format.  Returns a list of dicts.
     """
 
-    with course_search(headless=False) as driver:
+    with course_search(headless=True) as driver:
         select_instructor(driver, instructor)
         select_nonexpandable(driver, semester)
         courses = expand_all_courses(driver)
