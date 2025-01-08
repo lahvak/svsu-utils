@@ -28,6 +28,10 @@ SEM = '{} {}'.format(args.semester, args.year)
 INSTR = args.instructor
 
 
+def print_stderr(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
 def course_search(headless=True):
     options = webdriver.ChromeOptions()
     if headless:
@@ -44,20 +48,18 @@ def select_instructor(driver, name):
     try:
         ass = driver.find_element(By.ID, 'showallfaculties')
     except NoSuchElementException:
-        print('Cannot show all instructors')
+        print_stderr('Cannot show all instructors')
         sys.exit()
-    print('About to click on show all faculty')
     WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.ID, 'showallfaculties'))
     ).click()
-    print('Clicked on show all faculty')
     sleep(2)
     try:
         ass = driver.find_element(
             'xpath', "//label[contains(text(),'{}')]".format(name)
         )
     except NoSuchElementException:
-        print('Cannot find instructor ' + name)
+        print_stderr('Cannot find instructor ' + name)
         sys.exit()
     sleep(5)
     ass.click()
@@ -70,7 +72,7 @@ def select_nonexpandable(driver, label):
             'xpath', "//label[contains(text(),'{}')]".format(label)
         )
     except NoSuchElementException:
-        print('Cannot find element labeled ' + label)
+        print_stderr('Cannot find element labeled ' + label)
         sys.exit()
     ass.click()
     sleep(2)
@@ -80,7 +82,7 @@ def expand_all_courses(driver):
     try:
         cours_ul = driver.find_element(By.ID, 'course-resultul')
     except NoSuchElementException:
-        print('Cannot find course list')
+        print_stderr('Cannot find course list')
         sys.exit()
     courses = cours_ul.find_elements(By.CLASS_NAME, 'esg-collapsible-group')
     for c in courses:
@@ -103,8 +105,8 @@ def process_row(row):
         locashun = cells[1].text
         instructours = None
     else:
-        print('Weird number of cells in this row!')
-        print(len(cells))
+        print_stderr('Weird number of cells in this row!')
+        print_stderr(len(cells))
         sys.exit()
 
     return {
@@ -150,10 +152,14 @@ def us_to_sane_time(ustime):
 
     parts = ustime.split()
     if len(parts) != 2:
-        sys.error('invalid time format')
+        print_stderr('invalid time format')
+        print_stderr(ustime)
+        sys.exit()
     moparts = parts[0].split(':')
     if len(moparts) != 2:
-        sys.error('invalid time format')
+        print_stderr('invalid time format')
+        print_stderr(ustime)
+        sys.exit()
     if (parts[1].upper() == 'AM') or (moparts[0] == '12'):
         return parts[0]
 
