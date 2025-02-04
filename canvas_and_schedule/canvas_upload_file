@@ -19,6 +19,12 @@ parser.add_argument('--course', default=None,
                     help="Course to upload to. "
                     "Defaults to current course when in a course directory.\n"
                     "Must be one of courses in {}.".format(COURSEDIR))
+parser.add_argument('--section', dest="section", default=None,
+                    help="The section to upload to.\n"
+                    "Defaults to posting to all sections of the course."
+                    "Must be one of the sections listed in the "
+                    "course yaml file.")
+
 
 args = parser.parse_args()
 
@@ -40,9 +46,25 @@ except FileNotFoundError:
           "Perhaps you are not in a course directory?")
     sys.exit(1)
 
-for classid in config['sections']:
+
+# try to find section:
+if args.section is not None:
+    sectionID = None
+    for classid, classdata in config['sections'].items():
+        if 'secnum' in classdata and classdata['secnum'] == args.section:
+            sectionID = classid
+            break
+    if sectionID is None:
+        print("Could not find section {}!".format(args.section))
+        sys.exit(1)
     res = canvas.upload_file_to_course(classid, file,
                                        args.remote_path,
                                        overwrite=True)
-
     print(res)
+else:  # post to all sections
+    for classid in config['sections']:
+        res = canvas.upload_file_to_course(classid, file,
+                                           args.remote_path,
+                                           overwrite=True)
+
+        print(res)

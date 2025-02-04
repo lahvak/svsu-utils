@@ -20,6 +20,8 @@ parser.add_argument('course', nargs='?', default=None,
                     help="Course to open."
                     "Defaults to current course when in a course directory.\n"
                     "Must be one of courses in {}.".format(COURSEDIR))
+parser.add_argument('--section', dest="section", default=None,
+                    help="Which section to open")
 parser.add_argument('--page', dest="page", default=None,
                     help="Specific page to open")
 parser.add_argument('--browser', dest="browser", default=BROWSER,
@@ -43,5 +45,17 @@ except FileNotFoundError:
           "Perhaps you are not in a course directory?")
     sys.exit(1)
 
-for classid in config['sections']:
-    subprocess.run([args.browser, URL.format(classid) + PAGE])
+# try to find section:
+if args.section is not None:
+    sectionID = None
+    for classid, classdata in config['sections'].items():
+        if 'secnum' in classdata and classdata['secnum'] == args.section:
+            sectionID = classid
+            break
+    if sectionID is None:
+        print("Could not find section {}!".format(args.section))
+        sys.exit(1)
+    subprocess.run([args.browser, URL.format(sectionID) + PAGE])
+else:  # open all sections
+    for classid in config['sections']:
+        subprocess.run([args.browser, URL.format(classid) + PAGE])

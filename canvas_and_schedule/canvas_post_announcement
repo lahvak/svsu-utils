@@ -22,6 +22,11 @@ parser.add_argument('--course', dest="course", default=None,
                     help="Course to post to."
                     "Defaults to current course when in a course directory.\n"
                     "Must be one of courses in {}.".format(COURSEDIR))
+parser.add_argument('--section', dest="section", default=None,
+                    help="The section to post to.\n"
+                    "Defaults to posting to all sections of the course."
+                    "Must be one of the sections listed in the "
+                    "course yaml file.")
 
 args = parser.parse_args()
 
@@ -59,6 +64,19 @@ except FileNotFoundError:
 
 canvas.read_access_token()
 
-for classid in config['sections']:
-    print(canvas.post_announcement_from_markdown(classid, title, content,
+# try to find section:
+if args.section is not None:
+    sectionID = None
+    for classid, classdata in config['sections'].items():
+        if 'secnum' in classdata and classdata['secnum'] == args.section:
+            sectionID = classid
+            break
+    if sectionID is None:
+        print("Could not find section {}!".format(args.section))
+        sys.exit(1)
+    print(canvas.post_announcement_from_markdown(sectionID, title, content,
                                                  use_pandoc=True))
+else:  # post to all sections
+    for classid in config['sections']:
+        print(canvas.post_announcement_from_markdown(classid, title, content,
+                                                     use_pandoc=True))
